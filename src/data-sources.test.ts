@@ -97,6 +97,14 @@ describe("offline data source helpers", () => {
     ]);
   });
 
+  it("falls back to default offline languages without a manifest", () => {
+    expect(getDownloadTargets("2026-07-04-0900", null)).toEqual([
+      "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/all.json",
+      "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/lang/zh_CN.json",
+      "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/lang/zh_CN_pinyin.json",
+    ]);
+  });
+
   it("fetches remote builds only when requested", async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: true,

@@ -22,6 +22,7 @@ type LanguageUrls = {
 
 const DEFAULT_REMOTE_BASE_URL =
   "https://raw.githubusercontent.com/nornagon/cdda-data/main";
+const DEFAULT_OFFLINE_LANGUAGES = ["en", "zh_CN"];
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
@@ -146,7 +147,8 @@ export function getDownloadTargets(
   const base = dataBaseUrl(normalizedVersion, manifest, true);
   const targets = [`${base}/all.json`];
 
-  for (const locale of manifest?.offlineLanguages ?? []) {
+  for (const locale of manifest?.offlineLanguages ??
+    DEFAULT_OFFLINE_LANGUAGES) {
     if (isEnglishLocale(locale)) {
       continue;
     }

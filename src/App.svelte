@@ -46,6 +46,7 @@ let remoteBuildsLoading = false;
 let remoteBuildsError: string | null = null;
 let downloadMessage: string | null = null;
 let downloadingVersion: string | null = null;
+let downloadedVersions = new Set<string>();
 
 loadOfflineManifest()
   .then((manifest) => {
@@ -315,6 +316,27 @@ function langHref(lang: string, href: string) {
   return u.toString();
 }
 
+function switchToBuild(buildNumber: string) {
+  const url = new URL(location.href);
+  if (buildNumber === builds?.[0]?.build_number) {
+    url.searchParams.delete("v");
+  } else {
+    url.searchParams.set("v", buildNumber);
+  }
+  location.href = url.toString();
+}
+
+function currentLanguageLabel() {
+  if (!locale) {
+    return "English";
+  }
+  try {
+    return getLanguageName(locale);
+  } catch {
+    return locale;
+  }
+}
+
 async function showRemoteBuilds() {
   remoteBuildsLoading = true;
   remoteBuildsError = null;
@@ -345,6 +367,7 @@ async function downloadBuild(buildNumber: string) {
   downloadMessage = null;
   try {
     await downloadVersionData(buildNumber, offlineManifest);
+    downloadedVersions = new Set(downloadedVersions).add(buildNumber);
     downloadMessage = t("{buildNumber} downloaded. You can switch to it now.", {
       buildNumber,
     });
@@ -596,12 +619,7 @@ Anyway?`,
           value={$data?.build_number ??
             (version === "latest" ? builds[0].build_number : version)}
           on:change={(e) => {
-            const url = new URL(location.href);
-            const buildNumber = e.currentTarget.value;
-            if (buildNumber === builds?.[0].build_number)
-              url.searchParams.delete("v");
-            else url.searchParams.set("v", buildNumber);
-            location.href = url.toString();
+            switchToBuild(e.currentTarget.value);
           }}>
           <optgroup label="Stable">
             {#each builds.filter((b) => !b.prerelease) as build}
@@ -672,6 +690,8 @@ Anyway?`,
             <option value={lang}>{getLanguageName(lang)}</option>
           {/each}
         </select>
+      {:else if $data}
+        <select disabled><option>{currentLanguageLabel()}</option></select>
       {:else}
         <select disabled><option>{t("Loading...")}</option></select>
       {/if}
@@ -687,14 +707,22 @@ Anyway?`,
     <ul class="remote-builds">
       {#each remoteBuilds as build}
         <li>
-          <button
-            type="button"
-            disabled={downloadingVersion === build.build_number}
-            on:click={() => downloadBuild(build.build_number)}>
-            {downloadingVersion === build.build_number
-              ? t("Loading...")
-              : build.build_number}
-          </button>
+          {#if downloadedVersions.has(build.build_number)}
+            <span>{build.build_number}</span>
+            <button
+              type="button"
+              on:click={() => switchToBuild(build.build_number)}
+              >{t("Switch")}</button>
+          {:else}
+            <button
+              type="button"
+              disabled={downloadingVersion === build.build_number}
+              on:click={() => downloadBuild(build.build_number)}>
+              {downloadingVersion === build.build_number
+                ? t("Loading...")
+                : build.build_number}
+            </button>
+          {/if}
           {#if !build.prerelease}
             <span>{t("stable")}</span>
           {/if}
