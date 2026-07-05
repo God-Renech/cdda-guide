@@ -8,3 +8,7 @@ schema.json
 _test/
 _rendered/
 /public/offline-data/
+/android/.gradle/
+/android/build/
+/android/app/build/
+*.apk
