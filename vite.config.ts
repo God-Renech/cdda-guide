@@ -50,16 +50,16 @@ export default defineConfig({
         navigateFallback: "index.html",
         runtimeCaching: [
           {
-            // latest/all.json updates regularly, so try the network first.
+            // latest data updates regularly, so try the network first.
             urlPattern:
-              /^https:\/\/raw\.githubusercontent\.com\/.*\/latest\/all\.json$/,
+              /^https:\/\/raw\.githubusercontent\.com\/.*\/latest\/(?:all|lang\/[^/]+)\.json$/,
             handler: "NetworkFirst",
           },
           {
-            // the other all.json files are the same forever, so if we have
+            // the other data files are the same forever, so if we have
             // them from the cache they are fine.
             urlPattern:
-              /^https:\/\/raw\.githubusercontent\.com\/.*\/all\.json$/,
+              /^https:\/\/raw\.githubusercontent\.com\/.*\/data\/(?!latest\/).*\/(?:all|lang\/[^/]+)\.json$/,
             handler: "CacheFirst",
           },
           {
