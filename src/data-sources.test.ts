@@ -3,6 +3,7 @@ import {
   bundledBuildsFromManifest,
   dataJsonUrl,
   getDownloadTargets,
+  loadOfflineManifest,
   languageJsonUrls,
   loadRemoteBuilds,
   normalizeRequestedVersion,
@@ -117,5 +118,19 @@ describe("offline data source helpers", () => {
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/nornagon/cdda-data/main/builds.json",
     );
+  });
+
+  it("returns null from one shared offline manifest request when fetch rejects", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError("offline");
+    }) as unknown as typeof fetch;
+
+    await expect(
+      Promise.all([
+        loadOfflineManifest(fetchImpl),
+        loadOfflineManifest(fetchImpl),
+      ]),
+    ).resolves.toEqual([null, null]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

@@ -83,8 +83,8 @@ async function main() {
   await rm(outputRoot, { recursive: true, force: true });
   const builds = await fetchJson(`${remoteBaseUrl}/builds.json`);
   const selectedBuilds = selectBuilds(builds, versions);
-  const latest = builds[0];
-  const stable = builds.find((build) => !build.prerelease);
+  const stable =
+    selectedBuilds.find((build) => !build.prerelease) ?? selectedBuilds[0];
 
   for (const build of selectedBuilds) {
     const version = build.build_number;
@@ -109,7 +109,7 @@ async function main() {
 
   await writeJson(path.join(outputRoot, "offline-manifest.json"), {
     schemaVersion: 1,
-    defaultVersion: latest.build_number,
+    defaultVersion: selectedBuilds[0].build_number,
     stableVersion: stable.build_number,
     bundledVersions: selectedBuilds,
     offlineLanguages: ["en", "zh_CN"],

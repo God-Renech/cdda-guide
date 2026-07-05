@@ -161,16 +161,22 @@ export function getDownloadTargets(
   return targets;
 }
 
+let offlineManifestPromise: Promise<OfflineManifest | null> | null = null;
+
 export async function loadOfflineManifest(
   fetchImpl: typeof fetch = fetch,
 ): Promise<OfflineManifest | null> {
-  const response = await fetchImpl(
-    `${localDataBasePath(null)}/offline-manifest.json`,
-  );
-  if (!response.ok) {
-    return null;
+  if (!offlineManifestPromise) {
+    offlineManifestPromise = fetchImpl(
+      `${localDataBasePath(null)}/offline-manifest.json`,
+    )
+      .then((response) =>
+        response.ok ? (response.json() as Promise<OfflineManifest>) : null,
+      )
+      .then((manifest) => (manifest ? normalizedManifest(manifest) : null))
+      .catch(() => null);
   }
-  return normalizedManifest((await response.json()) as OfflineManifest);
+  return offlineManifestPromise;
 }
 
 export async function loadRemoteBuilds(

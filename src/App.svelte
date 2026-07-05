@@ -47,6 +47,9 @@ let remoteBuildsError: string | null = null;
 let downloadMessage: string | null = null;
 let downloadingVersion: string | null = null;
 let downloadedVersions = new Set<string>();
+let displayBuilds: BuildInfo[] = [];
+let activeBuildNumber: string | null = null;
+let activeBuild: BuildInfo | null = null;
 
 loadOfflineManifest()
   .then((manifest) => {
@@ -63,6 +66,27 @@ const url = new URL(location.href);
 const version = url.searchParams.get("v") ?? "latest";
 const locale = url.searchParams.get("lang");
 data.setVersion(version, locale);
+
+$: bundledDefaultBuildNumber = builds?.[0]?.build_number ?? null;
+$: activeBuildNumber =
+  $data?.build_number ??
+  (version === "latest" ? bundledDefaultBuildNumber : version);
+$: activeBuild = activeBuildNumber
+  ? (builds?.find((build) => build.build_number === activeBuildNumber) ??
+    remoteBuilds?.find((build) => build.build_number === activeBuildNumber) ?? {
+      build_number: activeBuildNumber,
+      prerelease: true,
+      created_at: "",
+      langs: ["zh_CN"],
+    })
+  : null;
+$: displayBuilds =
+  activeBuild &&
+  !(builds ?? []).some(
+    (build) => build.build_number === activeBuild?.build_number,
+  )
+    ? [...(builds ?? []), activeBuild]
+    : (builds ?? []);
 
 const tilesets = [
   {
@@ -385,10 +409,8 @@ async function downloadBuild(buildNumber: string) {
 <svelte:window on:click={maybeNavigate} on:keydown={maybeFocusSearch} />
 
 <svelte:head>
-  {#if builds && builds.length > 0}
-    {@const build_number =
-      version === "latest" ? builds[0].build_number : version}
-    {#each [...(builds.find((b) => b.build_number === build_number)?.langs ?? [])].sort( (a, b) => a.localeCompare(b), ) as lang}
+  {#if activeBuild}
+    {#each [...activeBuild.langs].sort((a, b) => a.localeCompare(b)) as lang}
       <link
         rel="alternate"
         hreflang={lang}
@@ -612,24 +634,23 @@ Anyway?`,
 
   <p class="data-options">
     {t("Version:")}
-    {#if $data || (builds && builds.length > 0)}
-      {#if builds && builds.length > 0}
+    {#if $data || displayBuilds.length > 0}
+      {#if displayBuilds.length > 0}
         <!-- svelte-ignore a11y-no-onchange -->
         <select
-          value={$data?.build_number ??
-            (version === "latest" ? builds[0].build_number : version)}
+          value={activeBuildNumber ?? ""}
           on:change={(e) => {
             switchToBuild(e.currentTarget.value);
           }}>
           <optgroup label="Stable">
-            {#each builds.filter((b) => !b.prerelease) as build}
+            {#each displayBuilds.filter((b) => !b.prerelease) as build}
               <option value={build.build_number}>{build.build_number}</option>
             {/each}
           </optgroup>
           <optgroup label="Experimental">
-            {#each builds.filter((b) => b.prerelease) as build, i}
+            {#each displayBuilds.filter((b) => b.prerelease) as build}
               <option value={build.build_number}
-                >{build.build_number}{#if i === 0}&nbsp;(latest){/if}</option>
+                >{build.build_number}{#if build.build_number === bundledDefaultBuildNumber}&nbsp;(latest){/if}</option>
             {/each}
           </optgroup>
         </select>
@@ -663,11 +684,8 @@ Anyway?`,
     </span>
     <span style="white-space: nowrap">
       {t("Language:")}
-      {#if builds && builds.length > 0}
-        {@const build_number =
-          version === "latest" ? builds[0].build_number : version}
-        {@const build = builds.find((b) => b.build_number === build_number)}
-        {@const langs = build?.langs ?? []}
+      {#if activeBuild}
+        {@const langs = activeBuild.langs}
         {@const validLangs = langs.filter((lang) => {
           try {
             getLanguageName(lang);

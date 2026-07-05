@@ -50,6 +50,14 @@ export default defineConfig({
         navigateFallback: "index.html",
         runtimeCaching: [
           {
+            // Bundled offline data is immutable for a deployed app version.
+            urlPattern: ({ sameOrigin, url }) =>
+              sameOrigin &&
+              url.pathname.startsWith("/offline-data/") &&
+              url.pathname.endsWith(".json"),
+            handler: "CacheFirst",
+          },
+          {
             // latest data updates regularly, so try the network first.
             urlPattern:
               /^https:\/\/raw\.githubusercontent\.com\/.*\/latest\/(?:all|lang\/[^/]+)\.json$/,
