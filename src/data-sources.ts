@@ -208,3 +208,25 @@ export async function downloadVersionData(
     await response.arrayBuffer();
   }
 }
+
+export async function deleteVersionData(
+  version: string,
+  manifest: OfflineManifest | null,
+  cacheStorage: CacheStorage | undefined = typeof caches === "undefined"
+    ? undefined
+    : caches,
+): Promise<void> {
+  if (!cacheStorage) {
+    return;
+  }
+
+  const targets = getDownloadTargets(version, manifest);
+  const cacheNames = await cacheStorage.keys();
+
+  await Promise.all(
+    cacheNames.map(async (cacheName) => {
+      const cache = await cacheStorage.open(cacheName);
+      await Promise.all(targets.map((target) => cache.delete(target)));
+    }),
+  );
+}

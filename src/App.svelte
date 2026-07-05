@@ -13,12 +13,20 @@ import debounce from "lodash/debounce";
 import { onDestroy } from "svelte";
 import {
   bundledBuildsFromManifest,
+  deleteVersionData,
   downloadVersionData,
   loadOfflineManifest,
   loadRemoteBuilds,
   type BuildInfo,
   type OfflineManifest,
 } from "./data-sources";
+import {
+  addDownloadedBuild,
+  loadDownloadedBuilds,
+  mergeSelectableBuilds,
+  removeDownloadedBuild,
+  saveDownloadedBuilds,
+} from "./downloaded-builds";
 import { localeFromUrl, setLocaleInUrl } from "./locale";
 
 let item: { type: string; id: string } | null = null;
@@ -45,9 +53,15 @@ let builds: BuildInfo[] | null = null;
 let remoteBuilds: BuildInfo[] | null = null;
 let remoteBuildsLoading = false;
 let remoteBuildsError: string | null = null;
+let downloadPanelOpen = false;
 let downloadMessage: string | null = null;
 let downloadingVersion: string | null = null;
-let downloadedVersions = new Set<string>();
+let deletingVersion: string | null = null;
+let downloadedBuilds = loadDownloadedBuilds();
+let downloadedVersions = new Set<string>(
+  downloadedBuilds.map((build) => build.build_number),
+);
+let selectableBuilds: BuildInfo[] = [];
 let displayBuilds: BuildInfo[] = [];
 let activeBuildNumber: string | null = null;
 let activeBuild: BuildInfo | null = null;
@@ -72,8 +86,11 @@ $: bundledDefaultBuildNumber = builds?.[0]?.build_number ?? null;
 $: activeBuildNumber =
   $data?.build_number ??
   (version === "latest" ? bundledDefaultBuildNumber : version);
+$: selectableBuilds = mergeSelectableBuilds(builds ?? [], downloadedBuilds);
 $: activeBuild = activeBuildNumber
-  ? (builds?.find((build) => build.build_number === activeBuildNumber) ??
+  ? (selectableBuilds.find(
+      (build) => build.build_number === activeBuildNumber,
+    ) ??
     remoteBuilds?.find((build) => build.build_number === activeBuildNumber) ?? {
       build_number: activeBuildNumber,
       prerelease: true,
@@ -83,11 +100,11 @@ $: activeBuild = activeBuildNumber
   : null;
 $: displayBuilds =
   activeBuild &&
-  !(builds ?? []).some(
+  !selectableBuilds.some(
     (build) => build.build_number === activeBuild?.build_number,
   )
-    ? [...(builds ?? []), activeBuild]
-    : (builds ?? []);
+    ? [...selectableBuilds, activeBuild]
+    : selectableBuilds;
 
 const tilesets = [
   {
@@ -360,6 +377,7 @@ function currentLanguageLabel() {
 }
 
 async function showRemoteBuilds() {
+  downloadPanelOpen = true;
   remoteBuildsLoading = true;
   remoteBuildsError = null;
   downloadMessage = null;
@@ -371,6 +389,14 @@ async function showRemoteBuilds() {
   } finally {
     remoteBuildsLoading = false;
   }
+}
+
+function syncDownloadedBuilds(nextDownloadedBuilds: BuildInfo[]) {
+  downloadedBuilds = nextDownloadedBuilds;
+  downloadedVersions = new Set(
+    downloadedBuilds.map((build) => build.build_number),
+  );
+  saveDownloadedBuilds(downloadedBuilds);
 }
 
 async function downloadBuild(buildNumber: string) {
@@ -387,9 +413,17 @@ async function downloadBuild(buildNumber: string) {
   downloadingVersion = buildNumber;
   remoteBuildsError = null;
   downloadMessage = null;
+  const build = remoteBuilds?.find(
+    (build) => build.build_number === buildNumber,
+  ) ?? {
+    build_number: buildNumber,
+    prerelease: true,
+    created_at: "",
+    langs: ["zh_CN"],
+  };
   try {
     await downloadVersionData(buildNumber, offlineManifest);
-    downloadedVersions = new Set(downloadedVersions).add(buildNumber);
+    syncDownloadedBuilds(addDownloadedBuild(downloadedBuilds, build));
     downloadMessage = t("{buildNumber} downloaded. You can switch to it now.", {
       buildNumber,
     });
@@ -400,6 +434,34 @@ async function downloadBuild(buildNumber: string) {
         : t("Unable to download {buildNumber}", { buildNumber });
   } finally {
     downloadingVersion = null;
+  }
+}
+
+async function deleteDownloadedBuild(buildNumber: string) {
+  if (
+    !confirm(
+      t("Delete downloaded offline data for {buildNumber}?", { buildNumber }),
+    )
+  ) {
+    return;
+  }
+  deletingVersion = buildNumber;
+  remoteBuildsError = null;
+  downloadMessage = null;
+  try {
+    await deleteVersionData(buildNumber, offlineManifest);
+    syncDownloadedBuilds(removeDownloadedBuild(downloadedBuilds, buildNumber));
+    downloadMessage = t("{buildNumber} deleted.", { buildNumber });
+    if (activeBuildNumber === buildNumber) {
+      switchToBuild(builds?.[0]?.build_number ?? "latest");
+    }
+  } catch (e) {
+    remoteBuildsError =
+      e instanceof Error
+        ? e.message
+        : t("Unable to delete {buildNumber}", { buildNumber });
+  } finally {
+    deletingVersion = null;
   }
 }
 </script>
@@ -718,32 +780,85 @@ Anyway?`,
   {#if downloadMessage}
     <p class="download-status">{downloadMessage}</p>
   {/if}
-  {#if remoteBuilds}
-    <ul class="remote-builds">
-      {#each remoteBuilds as build}
-        <li>
-          {#if downloadedVersions.has(build.build_number)}
-            <span>{build.build_number}</span>
-            <button
-              type="button"
-              on:click={() => switchToBuild(build.build_number)}
-              >{t("Switch")}</button>
-          {:else}
-            <button
-              type="button"
-              disabled={downloadingVersion === build.build_number}
-              on:click={() => downloadBuild(build.build_number)}>
-              {downloadingVersion === build.build_number
-                ? t("Loading...")
-                : build.build_number}
-            </button>
-          {/if}
-          {#if !build.prerelease}
-            <span>{t("stable")}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+  {#if downloadPanelOpen}
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div
+      class="download-backdrop"
+      on:click={(e) => {
+        if (e.target === e.currentTarget) downloadPanelOpen = false;
+      }}>
+      <div
+        class="download-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="download-panel-title">
+        <header class="download-panel-header">
+          <h2 id="download-panel-title">{t("Download other version")}</h2>
+          <button
+            type="button"
+            class="close-button"
+            aria-label={t("Close")}
+            on:click={() => (downloadPanelOpen = false)}>×</button>
+        </header>
+
+        {#if remoteBuildsLoading}
+          <p class="download-status">{t("Loading...")}</p>
+        {/if}
+        {#if remoteBuildsError}
+          <p class="download-error">
+            {t(
+              "Network problem loading versions. Please check your connection and try again.",
+            )}
+          </p>
+          <p class="download-status">{remoteBuildsError}</p>
+          <button type="button" on:click={showRemoteBuilds}
+            >{t("Retry")}</button>
+        {/if}
+        {#if downloadMessage}
+          <p class="download-status">{downloadMessage}</p>
+        {/if}
+        {#if remoteBuilds}
+          <ul class="remote-builds">
+            {#each remoteBuilds as build}
+              <li>
+                <div>
+                  <strong>{build.build_number}</strong>
+                  {#if !build.prerelease}
+                    <span>{t("stable")}</span>
+                  {/if}
+                </div>
+                <div class="remote-build-actions">
+                  {#if downloadedVersions.has(build.build_number)}
+                    <button
+                      type="button"
+                      on:click={() => switchToBuild(build.build_number)}
+                      >{t("Switch")}</button>
+                    <button
+                      type="button"
+                      disabled={deletingVersion === build.build_number}
+                      on:click={() =>
+                        deleteDownloadedBuild(build.build_number)}>
+                      {deletingVersion === build.build_number
+                        ? t("Loading...")
+                        : t("Delete")}
+                    </button>
+                  {:else}
+                    <button
+                      type="button"
+                      disabled={downloadingVersion === build.build_number}
+                      on:click={() => downloadBuild(build.build_number)}>
+                      {downloadingVersion === build.build_number
+                        ? t("Loading...")
+                        : t("Download")}
+                    </button>
+                  {/if}
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </div>
   {/if}
 </main>
 
@@ -814,17 +929,93 @@ nav > .title {
 }
 
 .remote-builds {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5em;
-  margin: -0.25em 0 1em;
+  display: grid;
+  gap: 0.35em;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .remote-builds li {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75em;
+  padding: 0.45em 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.remote-builds li:last-child {
+  border-bottom: 0;
+}
+
+.remote-build-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35em;
+}
+
+.download-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  align-items: end;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1em;
+}
+
+.download-panel {
+  width: min(100%, 720px);
+  max-height: min(76vh, 720px);
+  margin: 0 auto;
+  overflow: auto;
+  padding: 1em;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(33, 33, 33, 0.98);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.download-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  margin-bottom: 0.75em;
+}
+
+.download-panel-header h2 {
+  margin: 0;
+  font-size: 1.15em;
+}
+
+.close-button {
+  min-width: 2.25em;
+}
+
+.download-error {
+  margin: 0 0 0.5em;
+  color: var(--cata-color-red);
+}
+
+@media (max-width: 600px) {
+  .download-backdrop {
+    padding: 0.5em;
+  }
+
+  .download-panel {
+    max-height: 82vh;
+  }
+
+  .remote-builds li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .remote-build-actions {
+    justify-content: flex-start;
+  }
 }
 </style>

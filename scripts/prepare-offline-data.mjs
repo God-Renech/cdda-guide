@@ -1,5 +1,6 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { selectBuilds } from "./offline-build-selection.mjs";
 
 const remoteBaseUrl =
   "https://raw.githubusercontent.com/nornagon/cdda-data/main";
@@ -50,27 +51,6 @@ async function fetchOptionalJson(url) {
     );
   }
   return response.json();
-}
-
-function selectBuilds(builds, requestedVersions) {
-  const latest = builds[0];
-  const stable = builds.find((build) => !build.prerelease);
-  if (!latest) throw new Error("No latest build found in builds.json");
-  if (!stable) throw new Error("No stable build found in builds.json");
-
-  const selected = requestedVersions.map((version) => {
-    if (version === "latest") return latest;
-    if (version === "stable") return stable;
-    const build = builds.find(
-      (candidate) => String(candidate.build_number) === version,
-    );
-    if (!build) throw new Error(`Requested build not found: ${version}`);
-    return build;
-  });
-
-  return [
-    ...new Map(selected.map((build) => [build.build_number, build])).values(),
-  ];
 }
 
 async function writeJson(filePath, value) {

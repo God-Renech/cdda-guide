@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   bundledBuildsFromManifest,
   dataJsonUrl,
+  deleteVersionData,
   getDownloadTargets,
   loadOfflineManifest,
   languageJsonUrls,
@@ -104,6 +105,26 @@ describe("offline data source helpers", () => {
       "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/lang/zh_CN.json",
       "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/lang/zh_CN_pinyin.json",
     ]);
+  });
+
+  it("deletes all downloaded targets from every cache", async () => {
+    const deleteFromCache = vi.fn(async () => true);
+    const cacheStorage = {
+      keys: async () => ["workbox-runtime"],
+      open: async () => ({ delete: deleteFromCache }),
+    } as unknown as CacheStorage;
+
+    await deleteVersionData("2026-07-04-0900", manifest, cacheStorage);
+
+    expect(deleteFromCache).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/all.json",
+    );
+    expect(deleteFromCache).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/lang/zh_CN.json",
+    );
+    expect(deleteFromCache).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/nornagon/cdda-data/main/data/2026-07-04-0900/lang/zh_CN_pinyin.json",
+    );
   });
 
   it("fetches remote builds only when requested", async () => {
