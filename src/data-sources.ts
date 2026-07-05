@@ -112,6 +112,26 @@ export function languageJsonUrls(
   };
 }
 
+export function resolveDataUrls(
+  version: string,
+  locale: string | null,
+  manifest: OfflineManifest | null,
+) {
+  const normalized = normalizeRequestedVersion(version, manifest);
+  const { localeUrl, pinyinUrl } = languageJsonUrls(
+    normalized,
+    locale,
+    manifest,
+  );
+  return {
+    version: normalized,
+    dataUrl: dataJsonUrl(normalized, manifest),
+    localeUrl,
+    pinyinUrl,
+    bundled: isBundledVersion(normalized, manifest),
+  };
+}
+
 export function getDownloadTargets(
   version: string,
   manifest: OfflineManifest | null,

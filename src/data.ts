@@ -1,6 +1,7 @@
 import { writable } from "svelte/store";
 import makeI18n, { type Gettext } from "gettext.js";
 
+import { loadOfflineManifest, resolveDataUrls } from "./data-sources";
 import {
   type Translation,
   type Requirement,
@@ -1998,24 +1999,10 @@ const fetchJsonWithIncorrectProgress = async (
 };
 
 const fetchJson = async (
-  version: string,
+  url: string,
   progress: (receivedBytes: number, totalBytes: number) => void,
 ) => {
-  return fetchJsonWithProgress(
-    `https://raw.githubusercontent.com/nornagon/cdda-data/main/data/${version}/all.json`,
-    progress,
-  );
-};
-
-const fetchLocaleJson = async (
-  version: string,
-  locale: string,
-  progress: (receivedBytes: number, totalBytes: number) => void,
-) => {
-  return fetchJsonWithProgress(
-    `https://raw.githubusercontent.com/nornagon/cdda-data/main/data/${version}/lang/${locale}.json`,
-    progress,
-  );
+  return fetchJsonWithProgress(url, progress);
 };
 
 async function retry<T>(promiseGenerator: () => Promise<T>) {
@@ -2045,33 +2032,32 @@ export const data = {
       const received = receiveds.reduce((a, b) => a + b, 0);
       loadProgressStore.set([received, total]);
     };
+    const manifest = await loadOfflineManifest();
+    const sourceUrls = resolveDataUrls(version, locale, manifest);
+    const { dataUrl, localeUrl, pinyinUrl } = sourceUrls;
     const [dataJson, localeJson, pinyinNameJson] = await Promise.all([
       retry(() =>
-        fetchJson(version, (receivedBytes, totalBytes) => {
+        fetchJson(dataUrl, (receivedBytes, totalBytes) => {
           totals[0] = totalBytes;
           receiveds[0] = receivedBytes;
           updateProgress();
         }),
       ),
-      locale &&
+      localeUrl &&
         retry(() =>
-          fetchLocaleJson(version, locale, (receivedBytes, totalBytes) => {
+          fetchJson(localeUrl, (receivedBytes, totalBytes) => {
             totals[1] = totalBytes;
             receiveds[1] = receivedBytes;
             updateProgress();
           }),
         ),
-      locale?.startsWith("zh_") &&
+      pinyinUrl &&
         retry(() =>
-          fetchLocaleJson(
-            version,
-            locale + "_pinyin",
-            (receivedBytes, totalBytes) => {
-              totals[2] = totalBytes;
-              receiveds[2] = receivedBytes;
-              updateProgress();
-            },
-          ),
+          fetchJson(pinyinUrl, (receivedBytes, totalBytes) => {
+            totals[2] = totalBytes;
+            receiveds[2] = receivedBytes;
+            updateProgress();
+          }),
         ),
     ]);
     if (locale && localeJson) {

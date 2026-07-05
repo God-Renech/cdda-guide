@@ -5,6 +5,7 @@ import {
   languageJsonUrls,
   loadRemoteBuilds,
   normalizeRequestedVersion,
+  resolveDataUrls,
   type BuildInfo,
   type OfflineManifest,
 } from "./data-sources";
@@ -70,6 +71,16 @@ describe("offline data source helpers", () => {
     expect(languageJsonUrls("latest", "zh_CN", manifest)).toEqual({
       localeUrl: "/offline-data/data/2026-07-05-1200/lang/zh_CN.json",
       pinyinUrl: "/offline-data/data/2026-07-05-1200/lang/zh_CN_pinyin.json",
+    });
+  });
+
+  it("resolves data and language URLs together", () => {
+    expect(resolveDataUrls("latest", "zh_CN", manifest)).toEqual({
+      version: "2026-07-05-1200",
+      dataUrl: "/offline-data/data/2026-07-05-1200/all.json",
+      localeUrl: "/offline-data/data/2026-07-05-1200/lang/zh_CN.json",
+      pinyinUrl: "/offline-data/data/2026-07-05-1200/lang/zh_CN_pinyin.json",
+      bundled: true,
     });
   });
 
