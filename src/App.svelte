@@ -19,6 +19,7 @@ import {
   type BuildInfo,
   type OfflineManifest,
 } from "./data-sources";
+import { localeFromUrl, setLocaleInUrl } from "./locale";
 
 let item: { type: string; id: string } | null = null;
 let search: string = "";
@@ -64,7 +65,7 @@ loadOfflineManifest()
 
 const url = new URL(location.href);
 const version = url.searchParams.get("v") ?? "latest";
-const locale = url.searchParams.get("lang");
+const locale = localeFromUrl(url);
 data.setVersion(version, locale);
 
 $: bundledDefaultBuildNumber = builds?.[0]?.build_number ?? null;
@@ -336,7 +337,7 @@ $: (item, search, (currentHref = location.href));
 
 function langHref(lang: string, href: string) {
   const u = new URL(href);
-  u.searchParams.set("lang", lang);
+  setLocaleInUrl(u, lang);
   return u.toString();
 }
 
@@ -351,9 +352,6 @@ function switchToBuild(buildNumber: string) {
 }
 
 function currentLanguageLabel() {
-  if (!locale) {
-    return "English";
-  }
   try {
     return getLanguageName(locale);
   } catch {
@@ -588,7 +586,7 @@ Anyway?`,
       </InterpolatedTranslation>
     </p>
 
-    {#if locale}
+    {#if locale !== "en"}
       <p style="font-weight: bold">
         <InterpolatedTranslation
           str={t(
@@ -695,12 +693,11 @@ Anyway?`,
           }
         })}
         <select
-          value={locale || "en"}
+          value={locale}
           on:change={(e) => {
             const url = new URL(location.href);
             const lang = e.currentTarget.value;
-            if (lang === "en") url.searchParams.delete("lang");
-            else url.searchParams.set("lang", lang);
+            setLocaleInUrl(url, lang);
             location.href = url.toString();
           }}>
           <option value="en">English</option>

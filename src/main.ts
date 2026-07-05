@@ -4,6 +4,7 @@ import "@fontsource/unifont";
 import { registerSW } from "virtual:pwa-register";
 import { tx } from "@transifex/native";
 import { mount } from "svelte";
+import { localeFromUrl } from "./locale";
 
 tx.init({
   token: "1/1d8c1f9e14b4c21d70dd3f6fccdd0ab16b691105",
@@ -30,12 +31,9 @@ if (location.hash) {
 }
 
 const url = new URL(location.href);
-const locale = url.searchParams.get("lang");
-if (locale) {
-  tx.setCurrentLocale(locale).then(start, start);
-} else {
-  start();
-}
+const locale = localeFromUrl(url);
+tx.setCurrentLocale(locale).then(start, start);
+
 function start() {
   mount(App, {
     target: document.body,
