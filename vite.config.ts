@@ -46,7 +46,9 @@ export default defineConfig({
         display: "standalone",
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png}"],
+        globPatterns: ["**/*.{js,css,html,png,json}"],
+        // Bundled CDDA JSON data can include large all.json files.
+        maximumFileSizeToCacheInBytes: 256 * 1024 * 1024,
         navigateFallback: "index.html",
         runtimeCaching: [
           {
