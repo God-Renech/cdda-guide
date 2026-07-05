@@ -28,6 +28,10 @@ import {
   saveDownloadedBuilds,
 } from "./downloaded-builds";
 import { localeFromUrl, setLocaleInUrl } from "./locale";
+import {
+  markWelcomeNoticeSeen,
+  shouldShowWelcomeNotice,
+} from "./welcome-notice";
 
 let item: { type: string; id: string } | null = null;
 let search: string = "";
@@ -65,6 +69,7 @@ let selectableBuilds: BuildInfo[] = [];
 let displayBuilds: BuildInfo[] = [];
 let activeBuildNumber: string | null = null;
 let activeBuild: BuildInfo | null = null;
+let welcomeNoticeOpen = shouldShowWelcomeNotice();
 
 loadOfflineManifest()
   .then((manifest) => {
@@ -464,6 +469,11 @@ async function deleteDownloadedBuild(buildNumber: string) {
     deletingVersion = null;
   }
 }
+
+function dismissWelcomeNotice() {
+  welcomeNoticeOpen = false;
+  markWelcomeNoticeSeen();
+}
 </script>
 
 <svelte:window on:click={maybeNavigate} on:keydown={maybeFocusSearch} />
@@ -506,6 +516,24 @@ async function deleteDownloadedBuild(buildNumber: string) {
   </nav>
 </header>
 <main>
+  {#if welcomeNoticeOpen}
+    <div class="download-backdrop">
+      <div
+        class="welcome-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-notice-title">
+        <h2 id="welcome-notice-title">提示</h2>
+        <p>
+          cdda指南可以直接访问<a href="https://cdda.doiiars.com/?lang=zh_CN"
+            >https://cdda.doiiars.com/?lang=zh_CN</a
+          >，本来不想做离版的，群友催了一个月所以做了，有问题加群1021460103。
+        </p>
+        <button type="button" on:click={dismissWelcomeNotice}>知道了</button>
+      </div>
+    </div>
+  {/if}
+
   {#if item}
     {#if $data}
       {#key item}
@@ -976,6 +1004,21 @@ nav > .title {
   border-radius: 8px;
   background: rgba(33, 33, 33, 0.98);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.welcome-panel {
+  width: min(100%, 520px);
+  margin: auto;
+  padding: 1em;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(33, 33, 33, 0.98);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.welcome-panel h2 {
+  margin-top: 0;
+  font-size: 1.15em;
 }
 
 .download-panel-header {

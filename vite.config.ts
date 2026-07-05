@@ -26,8 +26,8 @@ export default defineConfig({
       },
       includeAssets: ["favicon.png"],
       manifest: {
-        short_name: "Cataclysm Guide",
-        name: "The Hitchhiker's Guide to the Cataclysm",
+        short_name: "CDDA物品浏览器离线版",
+        name: "CDDA物品浏览器离线版by_ab_irdiden",
         icons: [
           {
             src: "icon-192.png",
