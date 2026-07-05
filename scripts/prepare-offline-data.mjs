@@ -1,16 +1,33 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const remoteBaseUrl =
   "https://raw.githubusercontent.com/nornagon/cdda-data/main";
 const outputRoot = "public/offline-data";
 
+function usage() {
+  return "Usage: node scripts/prepare-offline-data.mjs [--versions=latest,stable]";
+}
+
 function parseArgs(argv) {
-  const versionsArg = argv.find((arg) => arg.startsWith("--versions="));
+  let versionsArg;
+  for (const arg of argv) {
+    if (!arg.startsWith("--versions=")) {
+      throw new Error(`${usage()}\nUnknown argument: ${arg}`);
+    }
+    versionsArg = arg.slice("--versions=".length);
+  }
+
+  if (versionsArg !== undefined) {
+    const versions = versionsArg.split(",").filter(Boolean);
+    if (versions.length === 0) {
+      throw new Error(`${usage()}\nAt least one version is required.`);
+    }
+    return { versions };
+  }
+
   return {
-    versions: versionsArg
-      ? versionsArg.slice("--versions=".length).split(",").filter(Boolean)
-      : ["latest", "stable"],
+    versions: ["latest", "stable"],
   };
 }
 
@@ -63,6 +80,7 @@ async function writeJson(filePath, value) {
 
 async function main() {
   const { versions } = parseArgs(process.argv.slice(2));
+  await rm(outputRoot, { recursive: true, force: true });
   const builds = await fetchJson(`${remoteBaseUrl}/builds.json`);
   const selectedBuilds = selectBuilds(builds, versions);
   const latest = builds[0];
