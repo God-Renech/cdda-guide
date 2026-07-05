@@ -11,4 +11,7 @@ _rendered/
 /android/.gradle/
 /android/build/
 /android/app/build/
+/android/keystore.properties
+/android/*.jks
+/android/*.keystore
 *.apk

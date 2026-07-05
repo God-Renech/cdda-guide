@@ -1008,17 +1008,24 @@ nav > .title {
 
 .welcome-panel {
   width: min(100%, 520px);
+  max-width: calc(100vw - 1em);
   margin: auto;
   padding: 1em;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
   background: rgba(33, 33, 33, 0.98);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow-wrap: anywhere;
 }
 
 .welcome-panel h2 {
   margin-top: 0;
   font-size: 1.15em;
+}
+
+.welcome-panel a {
+  overflow-wrap: anywhere;
 }
 
 .download-panel-header {
