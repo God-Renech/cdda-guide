@@ -10,6 +10,8 @@
     "build": "vite build",
     "prepare-offline-data": "node scripts/prepare-offline-data.mjs",
     "build:offline": "node scripts/prepare-offline-data.mjs && vite build",
+    "android:sync": "npm run build:offline && cap sync android",
+    "android:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "validate": "svelte-check && tsc --noEmit",
     "test": "npm run test:watch -- --run",
@@ -57,5 +59,10 @@
     "vitest": "^4.1.8",
     "workbox-build": "^7.4.1",
     "workbox-window": "^7.4.1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1"
   }
 }
