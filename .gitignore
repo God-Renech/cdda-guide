@@ -2,6 +2,7 @@
 dist
 dev-dist
 schema.json
+.worktrees/
 
 .DS_Store
 _test/
