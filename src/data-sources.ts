@@ -85,6 +85,12 @@ export function isBundledVersion(
   );
 }
 
+export function bundledBuildsFromManifest(
+  manifest: OfflineManifest | null,
+): BuildInfo[] {
+  return manifest?.bundledVersions ?? [];
+}
+
 export function dataJsonUrl(
   version: string,
   manifest: OfflineManifest | null,
@@ -178,7 +184,7 @@ export async function loadRemoteBuilds(
 
 export async function downloadVersionData(
   version: string,
-  manifest: OfflineManifest,
+  manifest: OfflineManifest | null,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   const targets = getDownloadTargets(version, manifest);

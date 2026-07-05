@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  bundledBuildsFromManifest,
   dataJsonUrl,
   getDownloadTargets,
   languageJsonUrls,
@@ -36,6 +37,10 @@ const manifest: OfflineManifest = {
 };
 
 describe("offline data source helpers", () => {
+  it("returns bundled builds from the offline manifest", () => {
+    expect(bundledBuildsFromManifest(manifest)).toEqual(bundledBuilds);
+  });
+
   it("maps latest to the bundled default version", () => {
     expect(normalizeRequestedVersion("latest", manifest)).toBe(
       "2026-07-05-1200",

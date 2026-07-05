@@ -11,6 +11,14 @@ import type { SupportedTypeMapped, SupportedTypesWithMapped } from "./types";
 import throttle from "lodash/throttle";
 import debounce from "lodash/debounce";
 import { onDestroy } from "svelte";
+import {
+  bundledBuildsFromManifest,
+  downloadVersionData,
+  loadOfflineManifest,
+  loadRemoteBuilds,
+  type BuildInfo,
+  type OfflineManifest,
+} from "./data-sources";
 
 let item: { type: string; id: string } | null = null;
 let search: string = "";
@@ -31,22 +39,23 @@ $: if (search !== renderedSearch) {
 
 onDestroy(updateRenderedSearch.cancel);
 
-let builds:
-  | {
-      build_number: string;
-      prerelease: boolean;
-      created_at: string;
-      langs?: string[];
-    }[]
-  | null = null;
+let offlineManifest: OfflineManifest | null = null;
+let builds: BuildInfo[] | null = null;
+let remoteBuilds: BuildInfo[] | null = null;
+let remoteBuildsLoading = false;
+let remoteBuildsError: string | null = null;
+let downloadMessage: string | null = null;
+let downloadingVersion: string | null = null;
 
-fetch("https://raw.githubusercontent.com/nornagon/cdda-data/main/builds.json")
-  .then((d) => d.json())
-  .then((b) => {
-    builds = b;
+loadOfflineManifest()
+  .then((manifest) => {
+    offlineManifest = manifest;
+    const bundledBuilds = bundledBuildsFromManifest(manifest);
+    builds = bundledBuilds.length > 0 ? bundledBuilds : null;
   })
   .catch((e) => {
     console.error(e);
+    builds = null;
   });
 
 const url = new URL(location.href);
@@ -305,12 +314,55 @@ function langHref(lang: string, href: string) {
   u.searchParams.set("lang", lang);
   return u.toString();
 }
+
+async function showRemoteBuilds() {
+  remoteBuildsLoading = true;
+  remoteBuildsError = null;
+  downloadMessage = null;
+  try {
+    remoteBuilds = await loadRemoteBuilds(fetch, offlineManifest);
+  } catch (e) {
+    remoteBuildsError =
+      e instanceof Error ? e.message : t("Unable to load remote versions");
+  } finally {
+    remoteBuildsLoading = false;
+  }
+}
+
+async function downloadBuild(buildNumber: string) {
+  if (
+    !confirm(
+      t(
+        "Download {buildNumber} for offline use? This downloads game JSON and Simplified Chinese language data.",
+        { buildNumber },
+      ),
+    )
+  ) {
+    return;
+  }
+  downloadingVersion = buildNumber;
+  remoteBuildsError = null;
+  downloadMessage = null;
+  try {
+    await downloadVersionData(buildNumber, offlineManifest);
+    downloadMessage = t("{buildNumber} downloaded. You can switch to it now.", {
+      buildNumber,
+    });
+  } catch (e) {
+    remoteBuildsError =
+      e instanceof Error
+        ? e.message
+        : t("Unable to download {buildNumber}", { buildNumber });
+  } finally {
+    downloadingVersion = null;
+  }
+}
 </script>
 
 <svelte:window on:click={maybeNavigate} on:keydown={maybeFocusSearch} />
 
 <svelte:head>
-  {#if builds}
+  {#if builds && builds.length > 0}
     {@const build_number =
       version === "latest" ? builds[0].build_number : version}
     {#each [...(builds.find((b) => b.build_number === build_number)?.langs ?? [])].sort( (a, b) => a.localeCompare(b), ) as lang}
@@ -537,8 +589,8 @@ Anyway?`,
 
   <p class="data-options">
     {t("Version:")}
-    {#if $data || builds}
-      {#if builds}
+    {#if $data || (builds && builds.length > 0)}
+      {#if builds && builds.length > 0}
         <!-- svelte-ignore a11y-no-onchange -->
         <select
           value={$data?.build_number ??
@@ -571,6 +623,12 @@ Anyway?`,
     {:else}
       <em style="color: var(--cata-color-gray)">({t("Loading...")})</em>
     {/if}
+    <button
+      type="button"
+      on:click={showRemoteBuilds}
+      disabled={remoteBuildsLoading}>
+      {remoteBuildsLoading ? t("Loading...") : t("Download other version")}
+    </button>
     <span style="white-space: nowrap">
       {t("Tileset:")}
       <!-- svelte-ignore a11y-no-onchange -->
@@ -587,7 +645,7 @@ Anyway?`,
     </span>
     <span style="white-space: nowrap">
       {t("Language:")}
-      {#if builds}
+      {#if builds && builds.length > 0}
         {@const build_number =
           version === "latest" ? builds[0].build_number : version}
         {@const build = builds.find((b) => b.build_number === build_number)}
@@ -619,6 +677,31 @@ Anyway?`,
       {/if}
     </span>
   </p>
+  {#if remoteBuildsError}
+    <p class="download-status">{remoteBuildsError}</p>
+  {/if}
+  {#if downloadMessage}
+    <p class="download-status">{downloadMessage}</p>
+  {/if}
+  {#if remoteBuilds}
+    <ul class="remote-builds">
+      {#each remoteBuilds as build}
+        <li>
+          <button
+            type="button"
+            disabled={downloadingVersion === build.build_number}
+            on:click={() => downloadBuild(build.build_number)}>
+            {downloadingVersion === build.build_number
+              ? t("Loading...")
+              : build.build_number}
+          </button>
+          {#if !build.prerelease}
+            <span>{t("stable")}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
 </main>
 
 <style>
@@ -679,5 +762,26 @@ nav > .title {
 
 .data-options select {
   max-width: 100%;
+}
+
+.download-status {
+  margin: -0.5em 0 0.75em;
+  color: var(--cata-color-gray);
+  font-size: 0.9em;
+}
+
+.remote-builds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin: -0.25em 0 1em;
+  padding: 0;
+  list-style: none;
+}
+
+.remote-builds li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
 }
 </style>
