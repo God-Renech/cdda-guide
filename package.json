@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "prepare-offline-data": "node scripts/prepare-offline-data.mjs",
-    "build:offline": "yarn prepare-offline-data && vite build",
+    "build:offline": "node scripts/prepare-offline-data.mjs && vite build",
     "preview": "vite preview",
     "validate": "svelte-check && tsc --noEmit",
     "test": "npm run test:watch -- --run",
